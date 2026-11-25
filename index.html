@@ -295,7 +295,29 @@
       </form>
     </div>
   </div>
-
+<!-- ===================================================================== -->
+  <!-- 3E. MODAL TRANSISI STATUS KLAIM GARANSI / RMA SUPPLIER                -->
+  <!-- ===================================================================== -->
+  <div id="rma-transition-modal" class="fixed inset-0 z-[93] hidden items-center justify-center bg-slate-900/65 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
+      <div class="px-5 py-4 bg-pln-navy text-white flex items-center justify-between">
+        <div>
+          <h3 id="rma-modal-title" class="text-sm sm:text-base font-bold">Update Status Klaim Garansi</h3>
+          <p id="rma-modal-subtitle" class="text-xs text-sky-200">SIMA - SCADA</p>
+        </div>
+        <button type="button" onclick="closeRmaTransitionModal()" class="px-3 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">&times;</button>
+      </div>
+      <form id="rma-transition-form" onsubmit="submitRmaTransition(event)" class="p-5 space-y-3.5 text-xs sm:text-sm">
+        <input type="hidden" id="rma-trans-id" />
+        <input type="hidden" id="rma-trans-action" />
+        <div id="rma-trans-fields" class="space-y-3"></div>
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeRmaTransitionModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition">Batal</button>
+          <button type="submit" id="rma-trans-submit-btn" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow transition">Simpan Status</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <!-- ===================================================================== -->
   <!-- 4. PRINT PREVIEW MODAL & DEDICATED PRINT STAGING AREA                 -->
   <!-- ===================================================================== -->
@@ -583,7 +605,8 @@
         mutasiInternal: [],
         bukuHutangDivisi: [],
         kartuStok: [],
-        logStockOpname: []
+        logStockOpname: [],
+        klaimGaransi: []
       },
       editingIds: {
         masterUser: null,
@@ -593,7 +616,8 @@
         transaksiMasuk: null,
         transaksiKeluar: null,
         mutasiInternal: null,
-        stockOpname: null
+        stockOpname: null,
+        klaimGaransi: null
       },
       selectedLabelUnitIds: new Set()
     };
@@ -2231,7 +2255,8 @@ function openChangePasswordModal() {
           mutasiInternal: cleanRows(data.mutasiInternal),
           bukuHutangDivisi: cleanRows(data.bukuHutangDivisi),
           kartuStok: cleanRows(data.kartuStok),
-          logStockOpname: cleanRows(data.logStockOpname)
+          logStockOpname: cleanRows(data.logStockOpname),
+          klaimGaransi: cleanRows(data.klaimGaransi)
         };
         saveDBCache(AppState.db);
         if (!silent) {
@@ -2290,7 +2315,8 @@ function openChangePasswordModal() {
           { id: 'tx-keluar', label: 'Barang Keluar', subtitle: 'Pengeluaran Material Gangguan, Har Rutin & Proyek', icon: 'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1' },
           { id: 'tx-alokasi', label: 'Alokasi FASOP & Pinjam', subtitle: 'Alokasi Stok Induk FASOP & Peminjaman Antar-Divisi', icon: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4' },
           { id: 'tx-mutasi', label: 'Mutasi Antar-Gudang', subtitle: 'Perpindahan Fisik Antar Gudang KU, K3 & UP2D', icon: 'M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z' },
-          { id: 'tx-opname', label: 'Stock Opname', subtitle: 'Pencatatan Fisik & Verifikasi Selisih Stok', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' }
+          { id: 'tx-opname', label: 'Stock Opname', subtitle: 'Pencatatan Fisik & Verifikasi Selisih Stok', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+          { id: 'tx-garansi', label: 'Klaim Garansi / RMA', subtitle: 'Unit Rusak Bergaransi, Penjemputan & Pengembalian PT Supplier', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' }
         ]
       },
       {
@@ -2407,6 +2433,7 @@ function openChangePasswordModal() {
         if (route === 'tx-alokasi') return renderAlokasiPinjamView(container);
         if (route === 'tx-mutasi') return renderMutasiGudangView(container);
         if (route === 'tx-opname') return renderStockOpnameView(container);
+        if (route === 'tx-garansi') return renderKlaimGaransiView(container);
         if (route === 'inv-stok') return renderStokGudangDivisiView(container);
         if (route === 'inv-sn') return renderPelacakanSNView(container);
         if (route === 'inv-kartu') return renderKartuStokView(container);
@@ -8705,6 +8732,636 @@ function openChangePasswordModal() {
         html,
         '@page { size: A4 portrait; margin: 12mm; }'
       );
+    }
+
+    /**
+     * ========================================================================
+     * MODUL TRANSAKSI: KLAIM GARANSI / RMA PT SUPPLIER (3 SIKLUS STATUS)
+     * ========================================================================
+     */
+    let rmaStatusFilter = 'ALL';
+
+    function setRmaStatusFilter(status) {
+      rmaStatusFilter = status;
+      renderActiveRoute();
+    }
+
+    function renderKlaimGaransiView(container) {
+      const canWrite = canEditTransactions();
+      const list = AppState.db.klaimGaransi || [];
+      const currentYear = new Date().getFullYear();
+
+      const countMenunggu = list.filter((x) => x.status_klaim === 'Menunggu Diambil Supplier').length;
+      const countDiVendor = list.filter((x) => x.status_klaim === 'Dalam Perbaikan Supplier').length;
+      const countSelesai = list.filter((x) => x.status_klaim === 'Selesai Perbaikan').length;
+
+      const filteredList = list.filter((x) => rmaStatusFilter === 'ALL' || x.status_klaim === rmaStatusFilter);
+
+      const uniqueJenisList = [];
+      const seenJenis = new Set();
+      AppState.db.masterBarang.forEach((b) => {
+        const j = String(b.jenis_material || '').trim();
+        if (j && !seenJenis.has(j.toUpperCase())) {
+          seenJenis.add(j.toUpperCase());
+          uniqueJenisList.push(j);
+        }
+      });
+
+      container.innerHTML = `
+        <!-- Ringkasan Status Tiket RMA -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700">1. Menunggu Diambil Supplier</span>
+            <p class="text-2xl font-extrabold font-code text-slate-900 mt-1">${countMenunggu}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Unit rusak terdata di karantina gudang PLN</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-sky-700">2. Dalam Perbaikan Supplier</span>
+            <p class="text-2xl font-extrabold font-code text-sky-700 mt-1">${countDiVendor}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Unit sedang dijemput / diperbaiki PT Supplier</p>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">3. Selesai Perbaikan (Kembali)</span>
+            <p class="text-2xl font-extrabold font-code text-emerald-700 mt-1">${countSelesai}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Sudah kembali masuk stok siap pakai Gudang/Divisi</p>
+          </div>
+        </div>
+
+        ${
+          canWrite
+            ? `
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="px-5 py-4 bg-slate-900 text-white">
+              <h2 class="text-sm sm:text-base font-bold">Pengajuan Tiket Klaim Garansi / RMA Supplier</h2>
+              <p class="text-xs text-sky-300">Pilih unit ber-Serial Number dengan masa garansi aktif (&ge; ${currentYear}) untuk didaftarkan ke proses klaim vendor</p>
+            </div>
+
+            <form id="form-klaim-garansi" onsubmit="submitKlaimGaransi(event)" class="p-5 space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Pengajuan *</label>
+                  <input type="date" id="rma-tanggal" value="${todayISO()}" required
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Divisi Pemilik Unit *</label>
+                  <select id="rma-divisi-asal" required onchange="onRmaFilterChange()"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    ${AppState.db.masterDivisi
+                      .map((d) => `<option value="${escapeHtml(d.id_divisi)}">${escapeHtml(d.nama_divisi)}</option>`)
+                      .join('')}
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Lokasi Gudang Saat Ini *</label>
+                  <select id="rma-gudang-asal" required onchange="onRmaFilterChange()"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    ${AppState.db.masterGudang
+                      .filter((g) => g.status_aktif === 'Aktif')
+                      .map((g) => `<option value="${escapeHtml(g.id_gudang)}">${escapeHtml(g.nama_gudang)}</option>`)
+                      .join('')}
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Jenis Material SCADA *</label>
+                  <select id="rma-jenis-material" required onchange="onRmaJenisChange()"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <option value="">-- Pilih Jenis Material --</option>
+                    ${uniqueJenisList.map((j) => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('')}
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Brand / Model *</label>
+                  <select id="rma-material" required onchange="onRmaFilterChange()"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <option value="">-- Pilih Jenis Material dahulu --</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Serial Number Bergaransi *</label>
+                  <select id="rma-sn" required onchange="onRmaSNSelected()"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-code text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    <option value="">-- Pilih Serial Number --</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">PT Supplier Klaim (Terkunci)</label>
+                  <input type="text" id="rma-pt-display" readonly placeholder="Otomatis dari SN"
+                    class="w-full px-3.5 py-2 rounded-xl border text-xs sm:text-sm input-locked" />
+                  <input type="hidden" id="rma-pt-kode" />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Masa Garansi &amp; Label (Terkunci)</label>
+                  <input type="text" id="rma-garansi-display" readonly placeholder="Otomatis dari SN"
+                    class="w-full px-3.5 py-2 rounded-xl border font-code text-xs sm:text-sm input-locked" />
+                  <input type="hidden" id="rma-kode-label" />
+                  <input type="hidden" id="rma-tahun-habis" />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">No. Kontrak / SPK Asal (Terkunci)</label>
+                  <input type="text" id="rma-spk" readonly
+                    class="w-full px-3.5 py-2 rounded-xl border text-xs sm:text-sm input-locked" />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">PIC Pelapor PLN *</label>
+                  <select id="rma-pic-pelapor" required
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    ${buildPetugasOptions(AppState.currentUser.username)}
+                  </select>
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Deskripsi Kerusakan / Gejala Teknis *</label>
+                  <input type="text" id="rma-keluhan" required placeholder="Contoh: Port komunikasi RS485 mati / modul power drop"
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none" />
+                </div>
+              </div>
+
+              <div class="pt-2 flex justify-end border-t border-slate-100">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs sm:text-sm font-bold shadow transition">
+                  Buat Tiket Klaim Garansi
+                </button>
+              </div>
+            </form>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Tabel Pelacakan Klaim Garansi -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm sm:text-base font-bold text-slate-900">Daftar Tiket Klaim Garansi &amp; Perbaikan Supplier</h3>
+              <p class="text-xs text-slate-500">Klik tombol tahap berikutnya saat barang dijemput PT Supplier atau saat barang selesai diperbaiki kembali ke PLN</p>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              ${['ALL', 'Menunggu Diambil Supplier', 'Dalam Perbaikan Supplier', 'Selesai Perbaikan']
+                .map(
+                  (st) => `
+                <button type="button" onclick="setRmaStatusFilter('${st}')"
+                  class="px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    rmaStatusFilter === st ? 'bg-pln-navy text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }">
+                  ${st === 'ALL' ? 'Semua' : st}
+                </button>
+              `
+                )
+                .join('')}
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-50 text-slate-600 border-b border-slate-200 uppercase text-[11px]">
+                  <th class="px-4 py-3 font-bold">ID Tiket &amp; Tgl</th>
+                  <th class="px-4 py-3 font-bold">Material &amp; Serial Number</th>
+                  <th class="px-4 py-3 font-bold">PT Supplier &amp; Keluhan</th>
+                  <th class="px-4 py-3 font-bold">Posisi / Tujuan Kembali</th>
+                  <th class="px-4 py-3 font-bold text-center">Status Siklus</th>
+                  <th class="px-4 py-3 font-bold text-right">Aksi Lanjutan</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${
+                  [...filteredList]
+                    .reverse()
+                    .map((r) => {
+                      const badgeCls =
+                        r.status_klaim === 'Selesai Perbaikan'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : r.status_klaim === 'Dalam Perbaikan Supplier'
+                          ? 'bg-sky-100 text-sky-800'
+                          : 'bg-amber-100 text-amber-800';
+
+                      let nextStepBtn = '';
+                      if (canWrite && r.status_klaim === 'Menunggu Diambil Supplier') {
+                        nextStepBtn = `<button type="button" onclick="openRmaTransitionModal('${r.id_klaim}', 'DIAMBIL_SUPPLIER')" class="px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold">Diambil Supplier</button>`;
+                      } else if (canWrite && r.status_klaim === 'Dalam Perbaikan Supplier') {
+                        nextStepBtn = `<button type="button" onclick="openRmaTransitionModal('${r.id_klaim}', 'SELESAI_PERBAIKAN')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Terima Hasil Perbaikan</button>`;
+                      }
+
+                      return `
+                        <tr class="hover:bg-slate-50/80 transition">
+                          <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="font-code font-bold text-pln-navy">${escapeHtml(r.id_klaim)}</span>
+                            <span class="block text-[11px] text-slate-500">Ajuan: ${escapeHtml(r.tanggal_pengajuan)}</span>
+                            ${r.tanggal_diambil_supplier ? `<span class="block text-[11px] text-sky-700">Ambil: ${escapeHtml(r.tanggal_diambil_supplier)}</span>` : ''}
+                            ${r.tanggal_kembali_pln ? `<span class="block text-[11px] text-emerald-700">Balik: ${escapeHtml(r.tanggal_kembali_pln)}</span>` : ''}
+                          </td>
+                          <td class="px-4 py-3">
+                            <span class="font-bold text-slate-900">${escapeHtml(r.kode_material)}</span> - ${escapeHtml(r.brand)} (${escapeHtml(r.model)})
+                            <span class="block font-code text-[11px] text-sky-700 font-semibold">SN Awal: ${escapeHtml(r.serial_number)}</span>
+                            ${r.serial_number_pengganti && r.serial_number_pengganti !== r.serial_number ? `<span class="block font-code text-[11px] text-emerald-700 font-bold">SN Baru: ${escapeHtml(r.serial_number_pengganti)}</span>` : ''}
+                          </td>
+                          <td class="px-4 py-3">
+                            <span class="font-bold text-slate-800">${escapeHtml(getPTNamaAsli(r.kode_pt_supplier))}</span>
+                            <span class="block text-[11px] text-slate-500">Garansi s.d. ${escapeHtml(r.tahun_habis_garansi)} &bull; ${escapeHtml(r.keluhan_kerusakan)}</span>
+                          </td>
+                          <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="text-slate-700">Asal: <b>${escapeHtml(getDivisiName(r.id_divisi_asal))}</b> (${escapeHtml(getGudangName(r.id_gudang_asal))})</span>
+                            ${
+                              r.id_divisi_tujuan_kembali
+                                ? `<span class="block text-[11px] text-emerald-700 font-bold">Kembali ke: ${escapeHtml(getDivisiName(r.id_divisi_tujuan_kembali))} (${escapeHtml(getGudangName(r.id_gudang_tujuan_kembali))})</span>`
+                                : ''
+                            }
+                          </td>
+                          <td class="px-4 py-3 text-center whitespace-nowrap">
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${badgeCls}">${escapeHtml(r.status_klaim)}</span>
+                          </td>
+                          <td class="px-4 py-3 text-right whitespace-nowrap space-x-1">
+                            ${nextStepBtn}
+                            <button type="button" onclick="printDokumenKlaimGaransiA4('${r.id_klaim}')" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold">A4</button>
+                            ${
+                              canWrite
+                                ? `<button type="button" onclick="handleDeleteKlaimGaransi('${r.id_klaim}')" class="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold">Hapus</button>`
+                                : ''
+                            }
+                          </td>
+                        </tr>
+                      `;
+                    })
+                    .join('') ||
+                  '<tr><td colspan="6" class="p-6 text-center text-slate-500">Belum ada data tiket Klaim Garansi / RMA.</td></tr>'
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      if (canWrite) onRmaFilterChange();
+    }
+
+    function onRmaJenisChange() {
+      const jenisSel = document.getElementById('rma-jenis-material');
+      const matSel = document.getElementById('rma-material');
+      if (!jenisSel || !matSel) return;
+
+      const selectedJenis = jenisSel.value.trim().toUpperCase();
+      if (!selectedJenis) {
+        matSel.innerHTML = '<option value="">-- Pilih Jenis Material dahulu --</option>';
+        onRmaFilterChange();
+        return;
+      }
+
+      const models = AppState.db.masterBarang.filter(
+        (b) => String(b.jenis_material || '').trim().toUpperCase() === selectedJenis
+      );
+      matSel.innerHTML =
+        `<option value="">-- Pilih Brand / Model --</option>` +
+        models
+          .map((b) => `<option value="${escapeHtml(b.kode_material)}">${escapeHtml(b.brand)} - ${escapeHtml(b.model)}</option>`)
+          .join('');
+      onRmaFilterChange();
+    }
+
+    function onRmaFilterChange() {
+      const divId = document.getElementById('rma-divisi-asal')?.value;
+      const gdgId = document.getElementById('rma-gudang-asal')?.value;
+      const matKode = document.getElementById('rma-material')?.value;
+      const snSel = document.getElementById('rma-sn');
+      if (!snSel) return;
+
+      const currentYear = new Date().getFullYear();
+      const activeRmaSNs = new Set(
+        (AppState.db.klaimGaransi || [])
+          .filter((k) => k.status_klaim !== 'Selesai Perbaikan')
+          .map((k) => String(k.serial_number || '').trim().toUpperCase())
+      );
+
+      const eligibleUnits = AppState.db.detailSerialNumber.filter((u) => {
+        if (u.id_divisi_pemilik !== divId || u.id_gudang_posisi !== gdgId) return false;
+        if (matKode && u.kode_material !== matKode) return false;
+        if (!['Karantina / Rusak', 'Siap Pakai'].includes(u.status_unit)) return false;
+        if (activeRmaSNs.has(String(u.serial_number || '').trim().toUpperCase())) return false;
+        const thnHabis = parseInt(u.tahun_habis_garansi, 10) || 0;
+        return u.kode_pt !== '000BKR' && thnHabis >= currentYear;
+      });
+
+      snSel.innerHTML =
+        `<option value="">-- Pilih SN Bergaransi (${eligibleUnits.length} unit) --</option>` +
+        eligibleUnits
+          .map(
+            (u) =>
+              `<option value="${escapeHtml(u.serial_number)}">${escapeHtml(u.serial_number)} [${escapeHtml(u.status_unit)} | Garansi s.d. ${escapeHtml(u.tahun_habis_garansi)}]</option>`
+          )
+          .join('');
+      onRmaSNSelected();
+    }
+
+    function onRmaSNSelected() {
+      const sn = document.getElementById('rma-sn')?.value;
+      const unit = AppState.db.detailSerialNumber.find((u) => u.serial_number === sn);
+
+      document.getElementById('rma-pt-display').value = unit ? `${unit.kode_pt} - ${getPTNamaAsli(unit.kode_pt)}` : '';
+      document.getElementById('rma-pt-kode').value = unit ? unit.kode_pt : '';
+      document.getElementById('rma-garansi-display').value = unit ? `s.d. ${unit.tahun_habis_garansi} (${unit.kode_label})` : '';
+      document.getElementById('rma-kode-label').value = unit ? unit.kode_label : '';
+      document.getElementById('rma-tahun-habis').value = unit ? unit.tahun_habis_garansi : '';
+      document.getElementById('rma-spk').value = unit ? unit.no_kontrak_spk : '';
+
+      if (unit && !document.getElementById('rma-material').value) {
+        const brg = getBarangObj(unit.kode_material);
+        if (brg) {
+          document.getElementById('rma-jenis-material').value = brg.jenis_material;
+          onRmaJenisChange();
+          document.getElementById('rma-material').value = unit.kode_material;
+        }
+      }
+    }
+
+    async function submitKlaimGaransi(e) {
+      e.preventDefault();
+      const sn = document.getElementById('rma-sn').value;
+      const unit = AppState.db.detailSerialNumber.find((u) => u.serial_number === sn);
+      if (!unit) {
+        showToast('Pilih Serial Number unit bergaransi terlebih dahulu.', 'warning');
+        return;
+      }
+
+      const payload = {
+        tanggal_pengajuan: document.getElementById('rma-tanggal').value,
+        id_divisi_asal: document.getElementById('rma-divisi-asal').value,
+        id_gudang_asal: document.getElementById('rma-gudang-asal').value,
+        kode_material: unit.kode_material,
+        brand: unit.brand,
+        model: unit.model,
+        serial_number: unit.serial_number,
+        kode_label: unit.kode_label,
+        kode_pt_supplier: unit.kode_pt,
+        no_kontrak_spk: unit.no_kontrak_spk,
+        tahun_habis_garansi: unit.tahun_habis_garansi,
+        keluhan_kerusakan: document.getElementById('rma-keluhan').value.trim(),
+        pic_pelapor: document.getElementById('rma-pic-pelapor').value
+      };
+
+      showLoader('Mendaftarkan tiket Klaim Garansi...');
+      try {
+        const res = await callBackend('saveKlaimGaransi', payload, AppState.currentUser.username);
+        showToast(res.message || 'Tiket Klaim Garansi berhasil dibuat.', 'success');
+        await refreshAllData(true);
+        renderActiveRoute();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        hideLoader();
+      }
+    }
+
+    function openRmaTransitionModal(idKlaim, actionType) {
+      const rma = (AppState.db.klaimGaransi || []).find((x) => x.id_klaim === idKlaim);
+      if (!rma) return;
+
+      document.getElementById('rma-trans-id').value = idKlaim;
+      document.getElementById('rma-trans-action').value = actionType;
+      const fieldsEl = document.getElementById('rma-trans-fields');
+      const submitBtn = document.getElementById('rma-trans-submit-btn');
+
+      if (actionType === 'DIAMBIL_SUPPLIER') {
+        document.getElementById('rma-modal-title').textContent = `Konfirmasi Diambil PT Supplier (${idKlaim})`;
+        document.getElementById('rma-modal-subtitle').textContent = `${rma.kode_material} • SN: ${rma.serial_number}`;
+        submitBtn.textContent = 'Simpan Penjemputan Supplier';
+        submitBtn.className = 'px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow transition';
+
+        fieldsEl.innerHTML = `
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Diambil PT Supplier *</label>
+            <input type="date" id="rma-f-tgl" value="${todayISO()}" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">PT Supplier / Vendor Pengambil *</label>
+            <select id="rma-f-pt" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs">
+              ${AppState.db.masterPT
+                .filter((p) => p.status_aktif === 'Aktif' && p.kode_pt !== '000BKR')
+                .map((p) => `<option value="${escapeHtml(p.kode_pt)}" ${p.kode_pt === rma.kode_pt_supplier ? 'selected' : ''}>${escapeHtml(p.kode_pt)} - ${escapeHtml(p.nama_perusahaan)}</option>`)
+                .join('')}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Nama PIC Pengambil (Vendor) *</label>
+            <input type="text" id="rma-f-pic-vendor" required oninput="formatTitleCaseInput(this)" placeholder="Nama perwakilan PT Supplier" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">No. Surat Jalan / Tanda Terima Vendor *</label>
+            <input type="text" id="rma-f-surat-jalan" required placeholder="Nomor tanda terima / RMA vendor" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">PIC Gudang PLN Penyerah *</label>
+            <select id="rma-f-pic-pln" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs">
+              ${buildPetugasOptions(AppState.currentUser.username)}
+            </select>
+          </div>
+        `;
+      } else {
+        document.getElementById('rma-modal-title').textContent = `Terima Hasil Perbaikan ke PLN (${idKlaim})`;
+        document.getElementById('rma-modal-subtitle').textContent = `${rma.kode_material} • SN Awal: ${rma.serial_number}`;
+        submitBtn.textContent = 'Simpan & Masukkan ke Stok PLN';
+        submitBtn.className = 'px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow transition';
+
+        fieldsEl.innerHTML = `
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Barang Kembali ke PLN *</label>
+            <input type="date" id="rma-f-tgl" value="${todayISO()}" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs" />
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Gudang Tujuan PLN *</label>
+              <select id="rma-f-gudang-tujuan" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs">
+                ${AppState.db.masterGudang
+                  .filter((g) => g.status_aktif === 'Aktif')
+                  .map((g) => `<option value="${escapeHtml(g.id_gudang)}" ${g.id_gudang === rma.id_gudang_asal ? 'selected' : ''}>${escapeHtml(g.nama_gudang)}</option>`)
+                  .join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Divisi Penerima Alokasi *</label>
+              <select id="rma-f-divisi-tujuan" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs">
+                ${AppState.db.masterDivisi
+                  .map((d) => `<option value="${escapeHtml(d.id_divisi)}" ${d.id_divisi === rma.id_divisi_asal ? 'selected' : ''}>${escapeHtml(d.nama_divisi)}</option>`)
+                  .join('')}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Serial Number Kembali (Ubah jika diganti unit baru) *</label>
+            <input type="text" id="rma-f-sn-kembali" value="${escapeHtml(rma.serial_number)}" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-code text-xs" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Kondisi Barang Kembali *</label>
+            <select id="rma-f-kondisi" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs">
+              <option value="Baru - Siap Pakai">Baru - Siap Pakai (Unit Pengganti Baru / Refurbished)</option>
+              <option value="Bongkar - Siap Pakai">Bongkar - Siap Pakai (Unit Lama Selesai Diperbaiki)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">PIC Penerima PLN *</label>
+            <select id="rma-f-pic-pln" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs">
+              ${buildPetugasOptions(AppState.currentUser.username)}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Catatan Hasil Perbaikan / No. BA Kembali *</label>
+            <input type="text" id="rma-f-catatan" required placeholder="Contoh: Modul power diganti baru, lulus uji fungsi" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs" />
+          </div>
+        `;
+      }
+
+      const modal = document.getElementById('rma-transition-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeRmaTransitionModal() {
+      const modal = document.getElementById('rma-transition-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    async function submitRmaTransition(e) {
+      e.preventDefault();
+      const idKlaim = document.getElementById('rma-trans-id').value;
+      const actionType = document.getElementById('rma-trans-action').value;
+
+      const detail =
+        actionType === 'DIAMBIL_SUPPLIER'
+          ? {
+              tanggal_diambil_supplier: document.getElementById('rma-f-tgl').value,
+              kode_pt_pengambil: document.getElementById('rma-f-pt').value,
+              nama_pic_vendor: toTitleCase(document.getElementById('rma-f-pic-vendor').value.trim()),
+              no_surat_jalan_vendor: document.getElementById('rma-f-surat-jalan').value.trim(),
+              pic_penyerah_pln: document.getElementById('rma-f-pic-pln').value
+            }
+          : {
+              tanggal_kembali_pln: document.getElementById('rma-f-tgl').value,
+              id_gudang_tujuan_kembali: document.getElementById('rma-f-gudang-tujuan').value,
+              id_divisi_tujuan_kembali: document.getElementById('rma-f-divisi-tujuan').value,
+              serial_number_pengganti: document.getElementById('rma-f-sn-kembali').value.trim(),
+              kondisi_kembali: document.getElementById('rma-f-kondisi').value,
+              pic_penerima_pln: document.getElementById('rma-f-pic-pln').value,
+              catatan_perbaikan: document.getElementById('rma-f-catatan').value.trim()
+            };
+
+      showLoader('Memperbarui siklus Klaim Garansi & saldo stok...');
+      try {
+        const res = await callBackend('updateStatusKlaimGaransi', idKlaim, actionType, detail, AppState.currentUser.username);
+        closeRmaTransitionModal();
+        showToast(res.message || 'Status Klaim Garansi diperbarui.', 'success');
+        await refreshAllData(true);
+        renderActiveRoute();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        hideLoader();
+      }
+    }
+
+    async function handleDeleteKlaimGaransi(idKlaim) {
+      const ok = await showConfirmModal({
+        title: `Hapus Tiket Klaim Garansi ${idKlaim}?`,
+        message: 'Sistem akan melakukan rollback otomatis terhadap status Serial Number dan saldo stok gudang terkait.',
+        confirmText: 'Ya, Hapus & Rollback'
+      });
+      if (!ok) return;
+
+      showLoader('Menjalankan rollback tiket Klaim Garansi...');
+      try {
+        const res = await callBackend('deleteKlaimGaransi', idKlaim, AppState.currentUser.username);
+        showToast(res.message || 'Tiket Klaim Garansi dihapus.', 'success');
+        await refreshAllData(true);
+        renderActiveRoute();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        hideLoader();
+      }
+    }
+
+    function printDokumenKlaimGaransiA4(idKlaim) {
+      const r = (AppState.db.klaimGaransi || []).find((x) => x.id_klaim === idKlaim);
+      if (!r) return;
+
+      const html = `
+        <div class="space-y-5 text-xs text-slate-900">
+          <div class="border-b-2 border-slate-900 pb-3 flex items-center justify-between">
+            <div>
+              <h1 class="text-base font-extrabold tracking-tight">SIMA - PLN UP2D JAKARTA</h1>
+              <p class="text-[11px] text-slate-600">Sistem Inventaris Material SCADA &bull; Berita Acara Klaim Garansi / RMA</p>
+            </div>
+            <div class="text-right font-code">
+              <span class="font-bold text-sm">${escapeHtml(r.id_klaim)}</span>
+              <span class="block text-[11px] text-slate-600">Status: ${escapeHtml(r.status_klaim)}</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div><span class="text-slate-500">Tanggal Pengajuan:</span> <b>${escapeHtml(r.tanggal_pengajuan)}</b></div>
+            <div><span class="text-slate-500">PT Supplier:</span> <b>${escapeHtml(getPTNamaAsli(r.kode_pt_supplier))}</b></div>
+            <div><span class="text-slate-500">Asal Gudang / Divisi:</span> <b>${escapeHtml(getGudangName(r.id_gudang_asal))} / ${escapeHtml(getDivisiName(r.id_divisi_asal))}</b></div>
+            <div><span class="text-slate-500">No. Kontrak / SPK:</span> <b>${escapeHtml(r.no_kontrak_spk)}</b></div>
+            ${r.tanggal_diambil_supplier ? `<div><span class="text-slate-500">Tgl Diambil Vendor:</span> <b>${escapeHtml(r.tanggal_diambil_supplier)} (${escapeHtml(r.nama_pic_vendor || '-')})</b></div>` : ''}
+            ${r.tanggal_kembali_pln ? `<div><span class="text-slate-500">Tgl Kembali ke PLN:</span> <b>${escapeHtml(r.tanggal_kembali_pln)} &rarr; ${escapeHtml(getDivisiName(r.id_divisi_tujuan_kembali))} (${escapeHtml(getGudangName(r.id_gudang_tujuan_kembali))})</b></div>` : ''}
+          </div>
+
+          <table class="w-full border-collapse border border-slate-400 text-xs">
+            <thead>
+              <tr class="bg-slate-100">
+                <th class="border border-slate-400 px-3 py-2 text-left">Kode Label</th>
+                <th class="border border-slate-400 px-3 py-2 text-left">Material &amp; Brand/Model</th>
+                <th class="border border-slate-400 px-3 py-2 text-left">Serial Number</th>
+                <th class="border border-slate-400 px-3 py-2 text-left">Keluhan / Hasil Perbaikan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="border border-slate-400 px-3 py-2 font-code font-bold">${escapeHtml(r.kode_label)}</td>
+                <td class="border border-slate-400 px-3 py-2">${escapeHtml(r.kode_material)} - ${escapeHtml(r.brand)} (${escapeHtml(r.model)})</td>
+                <td class="border border-slate-400 px-3 py-2 font-code">
+                  Awal: ${escapeHtml(r.serial_number)}
+                  ${r.serial_number_pengganti && r.serial_number_pengganti !== r.serial_number ? `<br/>Baru: <b>${escapeHtml(r.serial_number_pengganti)}</b>` : ''}
+                </td>
+                <td class="border border-slate-400 px-3 py-2">
+                  Keluhan: ${escapeHtml(r.keluhan_kerusakan)}
+                  ${r.catatan_perbaikan ? `<br/>Hasil: <b>${escapeHtml(r.catatan_perbaikan)}</b>` : ''}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="grid grid-cols-3 gap-4 pt-8 text-center">
+            <div>
+              <p class="mb-14">PIC Gudang PLN,</p>
+              <p class="font-bold underline">${escapeHtml(getUserDisplayName(r.pic_pelapor))}</p>
+            </div>
+            <div>
+              <p class="mb-14">Perwakilan PT Supplier,</p>
+              <p class="font-bold underline">${escapeHtml(r.nama_pic_vendor || '..............................')}</p>
+            </div>
+            <div>
+              <p class="mb-14">Mengetahui, Team Leader,</p>
+              <p class="font-bold underline">..............................</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('print-modal-title').textContent = `Berita Acara Klaim Garansi (${r.id_klaim})`;
+      document.getElementById('print-modal-subtitle').textContent = 'SIMA - PLN UP2D JAKARTA';
+      document.getElementById('print-preview-wrapper').innerHTML = html;
+      document.getElementById('print-staging-area').innerHTML = html;
+      const modal = document.getElementById('print-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
     }
   </script>
 </body>
