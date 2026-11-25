@@ -8746,6 +8746,36 @@ function openChangePasswordModal() {
       renderActiveRoute();
     }
 
+    function getEligibleRmaUnits(divId, gdgId, matKode = '') {
+      const currentYear = new Date().getFullYear();
+      const activeRmaSNs = new Set(
+        (AppState.db.klaimGaransi || [])
+          .filter((k) => k.status_klaim !== 'Selesai Perbaikan')
+          .map((k) => String(k.serial_number || '').trim().toUpperCase())
+      );
+
+      return AppState.db.detailSerialNumber.filter((u) => {
+        if (divId && u.id_divisi_pemilik !== divId) return false;
+        if (gdgId && u.id_gudang_posisi !== gdgId) return false;
+        if (
+          matKode &&
+          String(u.kode_material || '').trim().toUpperCase() !== String(matKode).trim().toUpperCase()
+        ) {
+          return false;
+        }
+        if (String(u.status_unit || '').trim() !== 'Karantina / Rusak') return false;
+        if (activeRmaSNs.has(String(u.serial_number || '').trim().toUpperCase())) return false;
+
+        const thnHabisRaw = String(u.tahun_habis_garansi || '').trim();
+        const thnHabis = parseInt(thnHabisRaw, 10) || 0;
+        return (
+          String(u.kode_pt || '').trim().toUpperCase() !== '000BKR' &&
+          thnHabisRaw !== '0000' &&
+          thnHabis >= currentYear
+        );
+      });
+    }
+
     function renderKlaimGaransiView(container) {
       const canWrite = canEditTransactions();
       const list = AppState.db.klaimGaransi || [];
@@ -8766,6 +8796,17 @@ function openChangePasswordModal() {
           uniqueJenisList.push(j);
         }
       });
+
+      const teamLeaderUsers = AppState.db.masterUser.filter(
+        (u) => u.status_role === 'Team Leader' && u.status_aktif === 'Aktif'
+      );
+      const teamLeaderOptions =
+        '<option value="">-- Pilih Team Leader --</option>' +
+        (teamLeaderUsers.length > 0
+          ? teamLeaderUsers
+              .map((u) => `<option value="${escapeHtml(u.username)}">${escapeHtml(u.nama_lengkap)}</option>`)
+              .join('')
+          : buildPetugasOptions(''));
 
       container.innerHTML = `
         <!-- Ringkasan Status Tiket RMA -->
@@ -8793,7 +8834,7 @@ function openChangePasswordModal() {
           <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div class="px-5 py-4 bg-slate-900 text-white">
               <h2 class="text-sm sm:text-base font-bold">Pengajuan Tiket Klaim Garansi / RMA Supplier</h2>
-              <p class="text-xs text-sky-300">Pilih unit ber-Serial Number dengan masa garansi aktif (&ge; ${currentYear}) untuk didaftarkan ke proses klaim vendor</p>
+              <p class="text-xs text-sky-300">Pilih unit berstatus Karantina / Rusak dengan masa garansi aktif (&ge; ${currentYear}) untuk didaftarkan ke proses klaim vendor</p>
             </div>
 
             <form id="form-klaim-garansi" onsubmit="submitKlaimGaransi(event)" class="p-5 space-y-4">
@@ -8806,7 +8847,7 @@ function openChangePasswordModal() {
 
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Divisi Pemilik Unit *</label>
-                  <select id="rma-divisi-asal" required onchange="onRmaFilterChange()"
+                  <select id="rma-divisi-asal" required onchange="onRmaJenisChange()"
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
                     ${AppState.db.masterDivisi
                       .map((d) => `<option value="${escapeHtml(d.id_divisi)}">${escapeHtml(d.nama_divisi)}</option>`)
@@ -8816,7 +8857,7 @@ function openChangePasswordModal() {
 
                 <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Lokasi Gudang Saat Ini *</label>
-                  <select id="rma-gudang-asal" required onchange="onRmaFilterChange()"
+                  <select id="rma-gudang-asal" required onchange="onRmaJenisChange()"
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
                     ${AppState.db.masterGudang
                       .filter((g) => g.status_aktif === 'Aktif')
@@ -8826,10 +8867,10 @@ function openChangePasswordModal() {
                 </div>
 
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 mb-1">Jenis Material SCADA *</label>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Material SCADA *</label>
                   <select id="rma-jenis-material" required onchange="onRmaJenisChange()"
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
-                    <option value="">-- Pilih Jenis Material --</option>
+                    <option value="">-- Pilih Material SCADA --</option>
                     ${uniqueJenisList.map((j) => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('')}
                   </select>
                 </div>
@@ -8838,7 +8879,7 @@ function openChangePasswordModal() {
                   <label class="block text-xs font-bold text-slate-700 mb-1">Brand / Model *</label>
                   <select id="rma-material" required onchange="onRmaFilterChange()"
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
-                    <option value="">-- Pilih Jenis Material dahulu --</option>
+                    <option value="">-- Pilih Material SCADA dahulu --</option>
                   </select>
                 </div>
 
@@ -8879,9 +8920,17 @@ function openChangePasswordModal() {
                   </select>
                 </div>
 
-                <div class="sm:col-span-2">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Team Leader *</label>
+                  <select id="rma-team-leader" required
+                    class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+                    ${teamLeaderOptions}
+                  </select>
+                </div>
+
+                <div>
                   <label class="block text-xs font-bold text-slate-700 mb-1">Deskripsi Kerusakan / Gejala Teknis *</label>
-                  <input type="text" id="rma-keluhan" required placeholder="Contoh: Port komunikasi RS485 mati / modul power drop"
+                  <input type="text" id="rma-keluhan" required placeholder="Contoh: Port RS485 mati / modul power drop"
                     class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none" />
                 </div>
               </div>
@@ -8970,6 +9019,7 @@ function openChangePasswordModal() {
                           </td>
                           <td class="px-4 py-3 whitespace-nowrap">
                             <span class="text-slate-700">Asal: <b>${escapeHtml(getDivisiName(r.id_divisi_asal))}</b> (${escapeHtml(getGudangName(r.id_gudang_asal))})</span>
+                            ${r.team_leader ? `<span class="block text-[11px] text-slate-600">TL: ${escapeHtml(getUserDisplayName(r.team_leader))}</span>` : ''}
                             ${
                               r.id_divisi_tujuan_kembali
                                 ? `<span class="block text-[11px] text-emerald-700 font-bold">Kembali ke: ${escapeHtml(getDivisiName(r.id_divisi_tujuan_kembali))} (${escapeHtml(getGudangName(r.id_gudang_tujuan_kembali))})</span>`
@@ -9000,57 +9050,81 @@ function openChangePasswordModal() {
         </div>
       `;
 
-      if (canWrite) onRmaFilterChange();
+      if (canWrite) onRmaJenisChange();
     }
 
     function onRmaJenisChange() {
       const jenisSel = document.getElementById('rma-jenis-material');
       const matSel = document.getElementById('rma-material');
+      const divId = document.getElementById('rma-divisi-asal')?.value;
+      const gdgId = document.getElementById('rma-gudang-asal')?.value;
       if (!jenisSel || !matSel) return;
 
       const selectedJenis = jenisSel.value.trim().toUpperCase();
+      const prevMatKode = String(matSel.value || '').trim().toUpperCase();
+
       if (!selectedJenis) {
-        matSel.innerHTML = '<option value="">-- Pilih Jenis Material dahulu --</option>';
+        matSel.innerHTML = '<option value="">-- Pilih Material SCADA dahulu --</option>';
         onRmaFilterChange();
         return;
       }
 
-      const models = AppState.db.masterBarang.filter(
-        (b) => String(b.jenis_material || '').trim().toUpperCase() === selectedJenis
-      );
-      matSel.innerHTML =
-        `<option value="">-- Pilih Brand / Model --</option>` +
-        models
-          .map((b) => `<option value="${escapeHtml(b.kode_material)}">${escapeHtml(b.brand)} - ${escapeHtml(b.model)}</option>`)
-          .join('');
+      const eligibleModels = AppState.db.masterBarang
+        .filter((b) => String(b.jenis_material || '').trim().toUpperCase() === selectedJenis)
+        .map((b) => ({
+          ...b,
+          eligibleCount: getEligibleRmaUnits(divId, gdgId, b.kode_material).length
+        }))
+        .filter((b) => b.eligibleCount > 0);
+
+      if (eligibleModels.length === 0) {
+        matSel.innerHTML = '<option value="">-- Tidak ada unit Rusak/Karantina bergaransi --</option>';
+      } else if (eligibleModels.length === 1) {
+        const single = eligibleModels[0];
+        matSel.innerHTML = `<option value="${escapeHtml(single.kode_material)}" selected>${escapeHtml(single.brand)} - ${escapeHtml(single.model)} (${single.eligibleCount} unit)</option>`;
+        matSel.value = single.kode_material;
+      } else {
+        matSel.innerHTML =
+          `<option value="">-- Pilih Brand / Model (${eligibleModels.length} tersedia) --</option>` +
+          eligibleModels
+            .map((b) => {
+              const isMatch = String(b.kode_material || '').trim().toUpperCase() === prevMatKode;
+              return `<option value="${escapeHtml(b.kode_material)}" ${isMatch ? 'selected' : ''}>${escapeHtml(b.brand)} - ${escapeHtml(b.model)} (${b.eligibleCount} unit)</option>`;
+            })
+            .join('');
+        const matched = Array.from(matSel.options).find(
+          (o) => o.value !== '' && String(o.value).trim().toUpperCase() === prevMatKode
+        );
+        if (matched) matSel.value = matched.value;
+      }
+
       onRmaFilterChange();
     }
 
     function onRmaFilterChange() {
       const divId = document.getElementById('rma-divisi-asal')?.value;
       const gdgId = document.getElementById('rma-gudang-asal')?.value;
+      const jenisVal = document.getElementById('rma-jenis-material')?.value.trim();
       const matKode = document.getElementById('rma-material')?.value;
       const snSel = document.getElementById('rma-sn');
       if (!snSel) return;
 
-      const currentYear = new Date().getFullYear();
-      const activeRmaSNs = new Set(
-        (AppState.db.klaimGaransi || [])
-          .filter((k) => k.status_klaim !== 'Selesai Perbaikan')
-          .map((k) => String(k.serial_number || '').trim().toUpperCase())
-      );
+      if (!jenisVal) {
+        snSel.innerHTML = '<option value="">-- Pilih Material SCADA dahulu --</option>';
+        onRmaSNSelected();
+        return;
+      }
 
-      const eligibleUnits = AppState.db.detailSerialNumber.filter((u) => {
-        if (u.id_divisi_pemilik !== divId || u.id_gudang_posisi !== gdgId) return false;
-        if (matKode && u.kode_material !== matKode) return false;
-        if (!['Karantina / Rusak', 'Siap Pakai'].includes(u.status_unit)) return false;
-        if (activeRmaSNs.has(String(u.serial_number || '').trim().toUpperCase())) return false;
-        const thnHabis = parseInt(u.tahun_habis_garansi, 10) || 0;
-        return u.kode_pt !== '000BKR' && thnHabis >= currentYear;
-      });
+      if (!matKode) {
+        snSel.innerHTML = '<option value="">-- Pilih Brand / Model dahulu --</option>';
+        onRmaSNSelected();
+        return;
+      }
+
+      const eligibleUnits = getEligibleRmaUnits(divId, gdgId, matKode);
 
       snSel.innerHTML =
-        `<option value="">-- Pilih SN Bergaransi (${eligibleUnits.length} unit) --</option>` +
+        `<option value="">-- Pilih SN Rusak/Karantina Bergaransi (${eligibleUnits.length} unit) --</option>` +
         eligibleUnits
           .map(
             (u) =>
@@ -9070,15 +9144,6 @@ function openChangePasswordModal() {
       document.getElementById('rma-kode-label').value = unit ? unit.kode_label : '';
       document.getElementById('rma-tahun-habis').value = unit ? unit.tahun_habis_garansi : '';
       document.getElementById('rma-spk').value = unit ? unit.no_kontrak_spk : '';
-
-      if (unit && !document.getElementById('rma-material').value) {
-        const brg = getBarangObj(unit.kode_material);
-        if (brg) {
-          document.getElementById('rma-jenis-material').value = brg.jenis_material;
-          onRmaJenisChange();
-          document.getElementById('rma-material').value = unit.kode_material;
-        }
-      }
     }
 
     async function submitKlaimGaransi(e) {
@@ -9086,7 +9151,7 @@ function openChangePasswordModal() {
       const sn = document.getElementById('rma-sn').value;
       const unit = AppState.db.detailSerialNumber.find((u) => u.serial_number === sn);
       if (!unit) {
-        showToast('Pilih Serial Number unit bergaransi terlebih dahulu.', 'warning');
+        showToast('Pilih Serial Number unit Rusak / Karantina bergaransi terlebih dahulu.', 'warning');
         return;
       }
 
@@ -9103,7 +9168,8 @@ function openChangePasswordModal() {
         no_kontrak_spk: unit.no_kontrak_spk,
         tahun_habis_garansi: unit.tahun_habis_garansi,
         keluhan_kerusakan: document.getElementById('rma-keluhan').value.trim(),
-        pic_pelapor: document.getElementById('rma-pic-pelapor').value
+        pic_pelapor: document.getElementById('rma-pic-pelapor').value,
+        team_leader: document.getElementById('rma-team-leader').value
       };
 
       showLoader('Mendaftarkan tiket Klaim Garansi...');
@@ -9349,7 +9415,7 @@ function openChangePasswordModal() {
             </div>
             <div>
               <p class="mb-14">Mengetahui, Team Leader,</p>
-              <p class="font-bold underline">..............................</p>
+              <p class="font-bold underline">${r.team_leader ? escapeHtml(getUserDisplayName(r.team_leader)) : '..............................'}</p>
             </div>
           </div>
         </div>
